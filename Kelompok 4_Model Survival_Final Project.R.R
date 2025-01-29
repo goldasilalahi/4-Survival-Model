@@ -8,6 +8,7 @@ library(ggplot2)
 library(ggfortify)
 library(dplyr)
 library(car)
+library(gridExtra)
 
 # Load data
 data <- read_excel("/Users/Golda/Github/College/sem 4/Model Survival/Final Project/melanoma.xlsx")
@@ -36,37 +37,24 @@ data$age_category <- cut(data$age,
                          labels = c("kanak-kanak", "remaja", "dewasa", "lansia", "manula"),
                          right = FALSE)
 
-# Plot variables
-plots <- list()
+# Define plot variables, types, and colors
+plot_vars <- c("time", "status", "sex", "age_category", "year", "thickness_strata", "ulcer")
+plot_types <- c("hist", "bar", "bar", "bar", "hist", "bar", "bar")
+plot_colors <- c("steelblue", "lightcoral", "maroon", "mediumseagreen", "gold", "turquoise", "lightsalmon")
 
-plots[['time']] <- ggplot(data, aes(x = time)) +
-  geom_histogram(binwidth = 50, fill = "steelblue", color = "black") +
-  ggtitle("Distribution of Time")
+# Generate plots using a loop
+plots <- lapply(seq_along(plot_vars), function(i) {
+  var <- plot_vars[i]
+  p <- ggplot(data, aes_string(x = var)) + ggtitle(paste("Distribution of", gsub("_", " ", var)))
+  
+  if (plot_types[i] == "hist") {
+    p + geom_histogram(binwidth = ifelse(var == "year", 1, 50), fill = plot_colors[i], color = "black")
+  } else {
+    p + geom_bar(fill = plot_colors[i], color = "black")
+  }
+})
 
-plots[['status']] <- ggplot(data, aes(x = factor(status))) +
-  geom_bar(fill = "lightcoral", color = "black") +
-  ggtitle("Distribution of Status")
-
-plots[['sex']] <- ggplot(data, aes(x = factor(sex))) +
-  geom_bar(fill = "maroon", color = "black") +
-  ggtitle("Distribution of Sex")
-
-plots[['age_category']] <- ggplot(data, aes(x = age_category)) +
-  geom_bar(fill = "mediumseagreen", color = "black") +
-  ggtitle("Distribution of Age")
-
-plots[['year']] <- ggplot(data, aes(x = year)) +
-  geom_histogram(binwidth = 1, fill = "gold", color = "black") +
-  ggtitle("Distribution of Year")
-
-plots[['thickness_strata']] <- ggplot(data, aes(x = thickness_strata)) +
-  geom_bar(fill = "turquoise", color = "black") +
-  ggtitle("Distribution of Thickness")
-
-plots[['ulcer']] <- ggplot(data, aes(x = factor(ulcer))) +
-  geom_bar(fill = "lightsalmon", color = "black") +
-  ggtitle("Distribution of Ulcer")
-
+# Display all plots
 library(gridExtra)
 grid.arrange(grobs = plots, ncol = 2)
 
@@ -131,17 +119,14 @@ uji.ph
 ggcoxzph(uji.ph)
 
 # Log-log plot
-plot(survfit(Surv(time, status) ~ ulcer, data = data), fun = "cloglog", lty = 1.2,
-     mark.time = FALSE, xlab = "Survival Time for Ulcer", ylab = "log(H(t))", xlim = c(1000, 2000))
+loglog_vars <- c("ulcer", "sex", "age_category", "thickness_strata")
 
-plot(survfit(Surv(time, status) ~ sex, data = data), fun = "cloglog", lty = 1.2,
-     mark.time = FALSE, xlab = "Survival Time for Sex", ylab = "log(H(t))", xlim = c(1000, 2000))
-
-plot(survfit(Surv(time, status) ~ age_category, data = data), fun = "cloglog", lty = 1.2,
-     mark.time = FALSE, xlab = "Survival Time for Age Category", ylab = "log(H(t))", xlim = c(1000, 2000))
-
-plot(survfit(Surv(time, status) ~ thickness_strata, data = data), fun = "cloglog", lty = 1.2,
-     mark.time = FALSE, xlab = "Survival Time for Thickness Strata", ylab = "log(H(t))", xlim = c(1000, 2000))
+lapply(loglog_vars, function(var) {
+  plot(survfit(as.formula(paste("Surv(time, status) ~", var)), data = data), 
+       fun = "cloglog", lty = 1.2, mark.time = FALSE, 
+       xlab = paste("Survival Time for", gsub("_", " ", var)), 
+       ylab = "log(H(t))", xlim = c(1000, 2000))
+})
 
 # Partial Likelihood
 model_breslow <- coxph(Surv(time, status) ~ ulcer + sex + age_category + thickness_strata, data = data, ties = "breslow")
